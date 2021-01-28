@@ -20,7 +20,7 @@ ENV ENVIRONMENT_NAME=teaser
 
 # curl is required to download Anaconda.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl llvm-8 wget zip unzip \
+    git curl wget zip unzip llvm-8 \
     build-essential python3-dev python3-pip python3-setuptools \
     xorg-dev libglu1-mesa-dev libsdl2-dev libc++-7-dev \
     libc++abi-7-dev ninja-build libxi-dev libtbb-dev libosmesa6-dev \
@@ -80,56 +80,7 @@ COPY ./environment.yml /tmp/
 #   && conda env update --file /tmp/environment.yml --prune
 
 RUN . ${CONDA_PATH}/bin/activate ${ENVIRONMENT_NAME} && \
-  conda install -c --quiet --yes \
-    open3d-admin \
-    open3d=0.9.0.0 \
-    pythreejs \
-    'beautifulsoup4=4.9.*' \
-    'conda-forge::blas=*=openblas' \
-    'bokeh=2.2.*' \
-    'bottleneck=1.3.*' \
-    'cloudpickle=1.6.*' \
-    'cython=0.29.*' \
-    'dask=2021.1.*' \
-    'dill=0.3.*' \
-    'h5py=3.1.*' \
-    'ipywidgets=7.6.*' \
-    'ipympl=0.6.*'\
-    'matplotlib-base=3.3.*' \
-    'numba=0.52.*' \
-    'numexpr=2.7.*' \
-    'pandas=1.2.*' \
-    'patsy=0.5.*' \
-    'protobuf=3.14.*' \
-    'pytables=3.6.*' \
-    'scikit-image=0.18.*' \
-    'scikit-learn=0.24.*' \
-    'scipy=1.6.*' \
-    'seaborn=0.11.*' \
-    'sqlalchemy=1.3.*' \
-    'statsmodels=0.12.*' \
-    'sympy=1.7.*' \
-    'vincent=0.4.*' \
-    'widgetsnbextension=3.5.*'\
-    'xlrd=2.0.*' && \
-    conda clean --all -f -y
-
-#*******************************************
-#
-# Compile and install PCL 1.91 from source
-#
-#*******************************************
-
-RUN export PCL_PACKAGE_DIR="$HOME/pcl" && \
-    mkdir "$PCL_PACKAGE_DIR" && \
-    cd "$PCL_PACKAGE_DIR" && \
-    wget "https://github.com/PointCloudLibrary/pcl/archive/pcl-1.9.1.zip" && \
-    unzip pcl-*.zip && \
-    rm pcl-*.zip && \
-    cd pcl-* && mkdir build && cd build && \
-    cmake .. && \
-    make -j $(python3 -c 'import multiprocessing as mp; print(int(mp.cpu_count()    * 1.5))') && \
-    sudo make install
+  conda install -c open3d-admin open3d=0.9.0.0 ipywidgets
 
 #*******************************************
 #
@@ -145,34 +96,22 @@ RUN cd ~ && \
 # Support headless
 #
 #*******************************************
-RUN cd /tmp && \
-    wget https://archive.mesa3d.org/mesa-19.0.8.tar.gz && \
-    tar xf mesa-19.0.8.tar.gz && \
-    cd mesa-19.0.8 && \
-    LLVM_CONFIG="/usr/bin/llvm-config-8" ./configure --prefix=$HOME/osmesa \
-        --disable-osmesa --disable-driglx-direct --disable-gbm --enable-dri \
-        --with-gallium-drivers=swrast --enable-autotools --enable-llvm --enable-gallium-osmesa && \
-    make -j$(nproc) && \
-    make install && \
-    cd ~/Open3D && \
-    mkdir build && cd build && \
-    cmake -DENABLE_HEADLESS_RENDERING=ON -DUSE_SYSTEM_GLEW=OFF -DUSE_SYSTEM_GLFW=OFF \
-        -DOSMESA_INCLUDE_DIR=$HOME/osmesa/include -DOSMESA_LIBRARY="$HOME/osmesa/lib/libOSMesa.so" \
-        .. && \
-    make -j$(nproc) && \
-    make install-pip-package
-
-
-#*******************************************
-#
-# Final Preparations
-#
-#*******************************************
-
-RUN cd /tmp \
-    git clone https://github.com/PAIR-code/facets.git && \
-    jupyter nbextension install facets/facets-dist/ --sys-prefix && \
-    rm -rf /tmp/facets
+#RUN cd /tmp && \
+#    wget https://archive.mesa3d.org/mesa-19.0.8.tar.gz && \
+#    tar xf mesa-19.0.8.tar.gz && \
+#    cd mesa-19.0.8 && \
+#    LLVM_CONFIG="/usr/bin/llvm-config-8" ./configure --prefix=$HOME/osmesa \
+#        --disable-osmesa --disable-driglx-direct --disable-gbm --enable-dri \
+#        --with-gallium-drivers=swrast --enable-autotools --enable-llvm --enable-gallium-osmesa && \
+#    make -j$(nproc) && \
+#    make install && \
+#    cd ~/Open3D && \
+#    mkdir build && cd build && \
+#    cmake -DENABLE_HEADLESS_RENDERING=ON -DUSE_SYSTEM_GLEW=OFF -DUSE_SYSTEM_GLFW=OFF \
+#        -DOSMESA_INCLUDE_DIR=$HOME/osmesa/include -DOSMESA_LIBRARY="$HOME/osmesa/lib/libOSMesa.so" \
+#        .. && \
+#    make -j$(nproc) && \
+#    make install-pip-package
 
 #*******************************************
 #
@@ -191,9 +130,16 @@ COPY ./test-gpu.py /root
 
 RUN rm -rf /tmp/*
 
-RUN pip3 install \
-    # Jupyter itself
-    jupyterlab
+#*******************************************
+#
+# Jupyter extension
+#
+#*******************************************
+
+RUN cd /tmp && \
+    git clone https://github.com/PAIR-code/facets.git && \
+    jupyter nbextension install facets/facets-dist/ --sys-prefix && \
+    rm -rf /tmp/facets
 
 # Add Tini. Tini operates as a process subreaper for jupyter. This prevents kernel crashes.
 ENV TINI_VERSION v0.6.0
