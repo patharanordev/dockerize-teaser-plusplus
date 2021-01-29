@@ -1,0 +1,167 @@
+FROM tensorflow/tensorflow:latest-gpu AS jupyter-base
+
+USER root
+
+#*******************************************
+#
+# Image Arguments and Environment Variables
+#
+#*******************************************
+
+# Specifies where Anaconda will be installed.
+ENV CONDA_PATH=/opt/anaconda3
+ENV ENVIRONMENT_NAME=teaser
+
+#*******************************************
+#
+# Install and Prepare Anaconda
+#
+#*******************************************
+
+# curl is required to download Anaconda.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl wget zip unzip \
+    build-essential python3-dev python3-pip python3-setuptools virtualenv \
+    xorg-dev libglu1-mesa-dev libsdl2-dev libc++-7-dev \
+    libc++abi-7-dev ninja-build libxi-dev libtbb-dev libosmesa6-dev \
+    npm nodejs libgl1-mesa-glx libeigen3-dev libboost-all-dev \
+    ffmpeg dvipng cm-super llvm-10*
+
+RUN pip3 -q install pip --upgrade
+# Install all basic packages
+RUN pip3 install \
+    # Jupyter itself
+    jupyterlab
+
+# Download and install Anaconda.
+RUN cd /tmp && curl -O https://repo.anaconda.com/archive/Anaconda3-2019.07-Linux-x86_64.sh
+RUN chmod +x /tmp/Anaconda3-2019.07-Linux-x86_64.sh
+RUN mkdir /root/.conda
+RUN bash -c "/tmp/Anaconda3-2019.07-Linux-x86_64.sh -b -p ${CONDA_PATH}"
+
+# Initializes Conda for shell interaction.
+RUN ${CONDA_PATH}/bin/conda init bash
+
+# Upgrade Conda to the latest version
+RUN ${CONDA_PATH}/bin/conda update -n base -c defaults conda -y
+
+# Create the working environment and setup its activation on start.
+RUN ${CONDA_PATH}/bin/conda create --name ${ENVIRONMENT_NAME} python=3.6 numpy -y
+RUN echo conda activate ${ENVIRONMENT_NAME} >> /root/.bashrc
+
+#*******************************************
+#
+# Install CMake
+#
+#*******************************************
+
+RUN cd /tmp && \
+    wget https://cmake.org/files/v3.19/cmake-3.19.3.tar.gz && \
+    tar -xzvf cmake-3.19.3.tar.gz && \
+    cd cmake-3.19.3/ && \
+    ./bootstrap && \
+    make -j4 && \
+    make install && \
+    cmake --version
+
+#*******************************************
+#
+# Install packages from environment.yml
+#
+#*******************************************
+
+# Copy environment.yml to /tmp
+COPY ./environment.yml /tmp/
+
+# This statement illustrates how to install packages using environment.yml on image creation.
+
+# # Update the working environment if USE_ENVIRONMENT_FILE is true.
+# RUN . ${CONDA_PATH}/bin/activate ${ENVIRONMENT_NAME} \
+#   && conda env update --file /tmp/environment.yml --prune
+
+RUN . ${CONDA_PATH}/bin/activate ${ENVIRONMENT_NAME} && \
+    conda install -c open3d-admin open3d=0.9.0.0 ipywidgets && \
+    conda install -c conda-forge meshplot pythreejs
+
+#*******************************************
+#
+# Open3D
+#
+#*******************************************
+
+RUN cd ~ && \
+    git clone --recursive https://github.com/intel-isl/Open3D
+
+    
+#*******************************************
+#
+# LLVM
+#
+#*******************************************
+
+# Set symlink for clang
+RUN apt-get install -y --no-install-recommends clang-6.0 && \
+    ln -s /usr/bin/clang-6.0 /usr/bin/clang && \
+    ln -s /usr/bin/clang++-6.0 /usr/bin/clang++
+
+#*******************************************
+#
+# Support headless
+#
+#*******************************************
+
+# RUN cd /usr/bin && \
+#     rm -rf llvm-config && \
+#     ln -s llvm-config-10 llvm-config && \
+#     cd /tmp && \
+#     wget https://archive.mesa3d.org/mesa-19.0.8.tar.gz && \
+#     tar xf mesa-19.0.8.tar.gz && \
+#     cd mesa-19.0.8 && \
+#     LLVM_CONFIG="/usr/bin/llvm-config" ./configure --prefix=$HOME/osmesa \
+#     --disable-osmesa --disable-driglx-direct --disable-gbm --enable-dri \
+#     --with-gallium-drivers=swrast --enable-autotools --enable-llvm --enable-gallium-osmesa && \
+#     make -j$(nproc) && \
+#     make install && \
+#     cd ~/Open3D && \
+#     mkdir build && cd build && \
+#     cmake -DENABLE_HEADLESS_RENDERING=ON -DUSE_SYSTEM_GLEW=OFF -DUSE_SYSTEM_GLFW=OFF \
+#         -DOSMESA_INCLUDE_DIR=$HOME/osmesa/include -DOSMESA_LIBRARY="$HOME/osmesa/lib/libOSMesa.so" \
+#         .. && \
+#     make -j$(nproc) && \
+#     make install-pip-package
+
+#*******************************************
+#
+# Final Preparations
+#
+#*******************************************
+
+# Copy the test script. Use it to verify if GPU is enabled after the container is started.
+COPY ./test-gpu.py /root
+
+#*******************************************
+#
+# Clean up the Image
+#
+#*******************************************
+
+RUN rm -rf /tmp/*
+
+#*******************************************
+#
+# Jupyter extension
+#
+#*******************************************
+
+RUN cd /tmp && \
+    git clone https://github.com/PAIR-code/facets.git && \
+    jupyter nbextension install facets/facets-dist/ --sys-prefix && \
+    rm -rf /tmp/facets
+
+# Add Tini. Tini operates as a process subreaper for jupyter. This prevents kernel crashes.
+ENV TINI_VERSION v0.6.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /usr/bin/tini
+RUN chmod +x /usr/bin/tini
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+CMD ["jupyter", "lab", "--port=8888", "--no-browser", "--ip=0.0.0.0", "--allow-root"]

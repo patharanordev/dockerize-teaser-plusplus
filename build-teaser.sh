@@ -1,0 +1,1 @@
+docker build -f Dockerfile.dev -t teasor-pp:0.0.5 .
