@@ -29,6 +29,10 @@ ENV ENVIRONMENT_NAME=main
 # By default CUDA image uses dash (/bin/sh -> dash) 
 SHELL ["/bin/bash", "-c"]
 
+
+# curl is required to download Anaconda.
+RUN apt-get update && apt-get install  -y curl wget htop
+
 #*******************************************
 #
 # Install CuDNN 
@@ -36,7 +40,9 @@ SHELL ["/bin/bash", "-c"]
 #*******************************************
 
 # Install CuDNN.
-COPY ./aux/libcudnn7_7.6.3.30-1+cuda10.0_amd64.deb /tmp
+# COPY ./aux/libcudnn7_7.6.3.30-1+cuda10.0_amd64.deb /tmp
+
+RUN cd /tmp/ && wget https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/libcudnn7_7.6.3.30-1+cuda10.0_amd64.deb
 RUN dpkg -i /tmp/libcudnn7_7.6.3.30-1+cuda10.0_amd64.deb
 
 #*******************************************
@@ -44,9 +50,6 @@ RUN dpkg -i /tmp/libcudnn7_7.6.3.30-1+cuda10.0_amd64.deb
 # Install and Prepare Anaconda 
 #
 #*******************************************
-
-# curl is required to download Anaconda.
-RUN apt-get update && apt-get install curl -y
 
 # Download and install Anaconda.
 RUN cd /tmp && curl -O https://repo.anaconda.com/archive/Anaconda3-2019.07-Linux-x86_64.sh
@@ -60,9 +63,10 @@ RUN ${CONDA_PATH}/bin/conda init bash
 # Upgrade Conda to the latest version
 RUN ${CONDA_PATH}/bin/conda update -n base -c defaults conda -y
 
-# Create the working environment and setup its activation on start.
-RUN ${CONDA_PATH}/bin/conda create --name ${ENVIRONMENT_NAME} -y
-RUN echo conda activate ${ENVIRONMENT_NAME} >> /root/.bashrc
+# # Create the working environment and setup its activation on start.
+# RUN ${CONDA_PATH}/bin/conda create --name ${ENVIRONMENT_NAME} -y
+# RUN echo conda activate ${ENVIRONMENT_NAME} >> /root/.bashrc
+RUN ${CONDA_PATH}/bin/conda install pip tensorflow-gpu pylint autopep8
 
 #*******************************************
 #
@@ -70,14 +74,14 @@ RUN echo conda activate ${ENVIRONMENT_NAME} >> /root/.bashrc
 #
 #*******************************************
 
-# Copy environment.yml to /tmp
-COPY ./environment.yml /tmp/
+# # Copy environment.yml to /tmp
+# COPY ./environment.yml /tmp/
 
-# This statement illustrates how to install packages using environment.yml on image creation.
+# # This statement illustrates how to install packages using environment.yml on image creation.
 
-# Update the working environment if USE_ENVIRONMENT_FILE is true.
-RUN . ${CONDA_PATH}/bin/activate ${ENVIRONMENT_NAME} \
-  && conda env update --file /tmp/environment.yml --prune
+# # Update the working environment if USE_ENVIRONMENT_FILE is true.
+# RUN . ${CONDA_PATH}/bin/activate ${ENVIRONMENT_NAME} && \
+#     conda env update --file /tmp/environment.yml --prune
 
 #*******************************************
 #
