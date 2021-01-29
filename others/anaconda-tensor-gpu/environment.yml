@@ -1,0 +1,7 @@
+dependencies:
+  - pip
+  - pip:
+      - tensorflow-gpu
+      # not used at runtime, for development envirnoment only
+      - pylint
+      - autopep8

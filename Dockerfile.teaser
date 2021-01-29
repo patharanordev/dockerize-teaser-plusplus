@@ -106,32 +106,6 @@ RUN apt-get install -y --no-install-recommends clang-6.0 && \
 
 #*******************************************
 #
-# Support headless
-#
-#*******************************************
-
-# RUN cd /usr/bin && \
-#     rm -rf llvm-config && \
-#     ln -s llvm-config-10 llvm-config && \
-#     cd /tmp && \
-#     wget https://archive.mesa3d.org/mesa-19.0.8.tar.gz && \
-#     tar xf mesa-19.0.8.tar.gz && \
-#     cd mesa-19.0.8 && \
-#     LLVM_CONFIG="/usr/bin/llvm-config" ./configure --prefix=$HOME/osmesa \
-#     --disable-osmesa --disable-driglx-direct --disable-gbm --enable-dri \
-#     --with-gallium-drivers=swrast --enable-autotools --enable-llvm --enable-gallium-osmesa && \
-#     make -j$(nproc) && \
-#     make install && \
-#     cd ~/Open3D && \
-#     mkdir build && cd build && \
-#     cmake -DENABLE_HEADLESS_RENDERING=ON -DUSE_SYSTEM_GLEW=OFF -DUSE_SYSTEM_GLFW=OFF \
-#         -DOSMESA_INCLUDE_DIR=$HOME/osmesa/include -DOSMESA_LIBRARY="$HOME/osmesa/lib/libOSMesa.so" \
-#         .. && \
-#     make -j$(nproc) && \
-#     make install-pip-package
-
-#*******************************************
-#
 # Final Preparations
 #
 #*******************************************
